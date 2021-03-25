@@ -40,6 +40,14 @@ type limiter struct {
 	updated time.Time
 }
 
+func (l *Limiters) GetBurst() int {
+	return l.burst
+}
+
+func (l *Limiters) GetMinInterval() time.Duration {
+	return l.minInterval
+}
+
 func (l *Limiters) GetLimiter(key string) *rate.Limiter {
 
 	l.lock.Lock()
