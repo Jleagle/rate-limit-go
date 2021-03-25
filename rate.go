@@ -7,9 +7,9 @@ import (
 	"golang.org/x/time/rate"
 )
 
-func New(per time.Duration, options ...Option) *limiters {
+func New(per time.Duration, options ...Option) *Limiters {
 
-	l := &limiters{
+	l := &Limiters{
 		limiters:      map[string]*limiter{},
 		limit:         rate.Every(per),
 		burst:         1,
@@ -26,7 +26,7 @@ func New(per time.Duration, options ...Option) *limiters {
 	return l
 }
 
-type limiters struct {
+type Limiters struct {
 	limiters      map[string]*limiter
 	lock          sync.Mutex
 	limit         rate.Limit
@@ -40,7 +40,7 @@ type limiter struct {
 	updated time.Time
 }
 
-func (l *limiters) GetLimiter(key string) *rate.Limiter {
+func (l *Limiters) GetLimiter(key string) *rate.Limiter {
 
 	l.lock.Lock()
 	defer l.lock.Unlock()
@@ -62,7 +62,7 @@ func (l *limiters) GetLimiter(key string) *rate.Limiter {
 	return lim.limiter
 }
 
-func (l *limiters) clean() {
+func (l *Limiters) clean() {
 
 	for {
 		time.Sleep(l.cleanInterval)
@@ -79,22 +79,22 @@ func (l *limiters) clean() {
 	}
 }
 
-type Option func(l *limiters)
+type Option func(l *Limiters)
 
 func WithBurst(burst int) Option {
-	return func(l *limiters) {
+	return func(l *Limiters) {
 		l.burst = burst
 	}
 }
 
 func WithCleanCutoff(duration time.Duration) Option {
-	return func(l *limiters) {
+	return func(l *Limiters) {
 		l.cleanCutoff = duration
 	}
 }
 
 func WithCleanInterval(duration time.Duration) Option {
-	return func(l *limiters) {
+	return func(l *Limiters) {
 		l.cleanInterval = duration
 	}
 }
