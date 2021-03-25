@@ -7,11 +7,11 @@ import (
 	"golang.org/x/time/rate"
 )
 
-func New(per time.Duration, options ...Option) *Limiters {
+func New(minInterval time.Duration, options ...Option) *Limiters {
 
 	l := &Limiters{
 		limiters:      map[string]*limiter{},
-		limit:         rate.Every(per),
+		minInterval:   minInterval,
 		burst:         1,
 		cleanInterval: time.Minute,
 		cleanCutoff:   time.Hour,
@@ -29,7 +29,7 @@ func New(per time.Duration, options ...Option) *Limiters {
 type Limiters struct {
 	limiters      map[string]*limiter
 	lock          sync.Mutex
-	limit         rate.Limit
+	minInterval   time.Duration
 	burst         int
 	cleanInterval time.Duration
 	cleanCutoff   time.Duration
@@ -50,7 +50,7 @@ func (l *Limiters) GetLimiter(key string) *rate.Limiter {
 	if !exists {
 
 		lim = &limiter{
-			limiter: rate.NewLimiter(l.limit, l.burst),
+			limiter: rate.NewLimiter(rate.Every(l.minInterval), l.burst),
 		}
 
 		l.limiters[key] = lim
