@@ -36,14 +36,14 @@ func ErrorMiddleware(limiters func(*http.Request) *Limiters, errorHandler http.H
 	}
 }
 
-func BlockMiddleware(limiters func(*http.Request) *Limiters, key func(*http.Request) string, errorHandler http.HandlerFunc) func(http.Handler) http.Handler {
+func BlockMiddleware(limiters func(*http.Request) *Limiters, key func(*http.Request) string, errorHandler func(http.ResponseWriter, *http.Request, error)) func(http.Handler) http.Handler {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 			err := limiters(r).GetLimiter(key(r)).Wait(r.Context())
 			if err != nil {
-				errorHandler(w, r)
+				errorHandler(w, r, err)
 				return
 			}
 
