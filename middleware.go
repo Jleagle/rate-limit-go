@@ -15,16 +15,18 @@ func SetRateLimitHeaders(w http.ResponseWriter, limiters *Limiters, reservation 
 	w.Header().Set("X-RateLimit-Bucket", "global")
 }
 
-func ErrorMiddleware(limiters *Limiters, handler http.HandlerFunc) func(http.Handler) http.Handler {
+func ErrorMiddleware(limiters func(*http.Request) *Limiters, errorHandler http.HandlerFunc) func(http.Handler) http.Handler {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			reservation := limiters.GetLimiter(r.RemoteAddr).Reserve()
+			limiters2 := limiters(r)
+
+			reservation := limiters2.GetLimiter(r.RemoteAddr).Reserve()
 			if reservation.Delay() > 0 {
 
-				SetRateLimitHeaders(w, limiters, reservation)
-				handler(w, r)
+				SetRateLimitHeaders(w, limiters2, reservation)
+				errorHandler(w, r)
 				reservation.Cancel()
 				return
 			}
@@ -34,14 +36,14 @@ func ErrorMiddleware(limiters *Limiters, handler http.HandlerFunc) func(http.Han
 	}
 }
 
-func BlockMiddleware(limiters *Limiters, handler http.HandlerFunc, key func(*http.Request) string) func(http.Handler) http.Handler {
+func BlockMiddleware(limiters func(*http.Request) *Limiters, key func(*http.Request) string, errorHandler http.HandlerFunc) func(http.Handler) http.Handler {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			err := limiters.GetLimiter(key(r)).Wait(r.Context())
+			err := limiters(r).GetLimiter(key(r)).Wait(r.Context())
 			if err != nil {
-				handler(w, r)
+				errorHandler(w, r)
 				return
 			}
 
