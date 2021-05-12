@@ -7,7 +7,7 @@ import (
 
 func TestOptions(t *testing.T) {
 
-	rate := New(time.Second, WithBurst(10), WithCleanCutoff(time.Second*3), WithCleanInterval(time.Second*3))
+	rate := New(time.Second, WithBurst(10), WithCleanCutoff(time.Second*3), WithCleanInterval(time.Second*3), WithBucketName("test"))
 	if rate.burst != 10 {
 		t.Errorf("burst = %d; want 10", rate.burst)
 	}
@@ -16,5 +16,8 @@ func TestOptions(t *testing.T) {
 	}
 	if rate.cleanInterval != time.Second*3 {
 		t.Errorf("interval = %s; want 3s", rate.cleanInterval)
+	}
+	if rate.bucketName != "test" {
+		t.Errorf("bucketName = %s; want test", rate.bucketName)
 	}
 }

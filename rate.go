@@ -33,6 +33,7 @@ type Limiters struct {
 	burst         int
 	cleanInterval time.Duration
 	cleanCutoff   time.Duration
+	bucketName    string
 }
 
 type limiter struct {
@@ -46,6 +47,10 @@ func (l *Limiters) GetBurst() int {
 
 func (l *Limiters) GetMinInterval() time.Duration {
 	return l.minInterval
+}
+
+func (l *Limiters) GetBucketName() string {
+	return l.bucketName
 }
 
 func (l *Limiters) GetLimiter(key string) *rate.Limiter {
@@ -104,5 +109,11 @@ func WithCleanCutoff(duration time.Duration) Option {
 func WithCleanInterval(duration time.Duration) Option {
 	return func(l *Limiters) {
 		l.cleanInterval = duration
+	}
+}
+
+func WithBucketName(name string) Option {
+	return func(l *Limiters) {
+		l.bucketName = name
 	}
 }
