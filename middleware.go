@@ -3,51 +3,62 @@ package rate
 import (
 	"fmt"
 	"net/http"
-
-	"golang.org/x/time/rate"
 )
 
-func SetRateLimitHeaders(w http.ResponseWriter, limiters *Limiters, reservation *rate.Reservation) {
-
-	w.Header().Set("X-RateLimit-Every", limiters.GetMinInterval().String())
-	w.Header().Set("X-RateLimit-Burst", fmt.Sprint(limiters.GetBurst()))
-	w.Header().Set("X-RateLimit-Wait", reservation.Delay().String())
-	w.Header().Set("X-RateLimit-Bucket", "global")
+func ErrorMiddlewareFunc(limiters func(*http.Request) *Limiters, errorHandler http.Handler) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return errorMiddleware(limiters, errorHandler, next)
+	}
 }
 
-func ErrorMiddleware(limiters func(*http.Request) *Limiters, errorHandler http.HandlerFunc) func(http.Handler) http.Handler {
-
+func ErrorMiddleware(limiters func(*http.Request) *Limiters, errorHandler http.Handler) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		return errorMiddleware(limiters, errorHandler, next)
+	}
+}
 
-			limiters2 := limiters(r)
+func errorMiddleware(limiters func(*http.Request) *Limiters, errorHandler http.Handler, next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 
-			reservation := limiters2.GetLimiter(r.RemoteAddr).Reserve()
-			if reservation.Delay() > 0 {
+		limiters2 := limiters(r)
 
-				SetRateLimitHeaders(w, limiters2, reservation)
-				errorHandler(w, r)
-				reservation.Cancel()
-				return
-			}
+		reservation := limiters2.GetLimiter(r.RemoteAddr).Reserve()
+		if reservation.Delay() > 0 {
 
-			next.ServeHTTP(w, r)
-		})
+			w.Header().Set("X-RateLimit-Every", limiters2.GetMinInterval().String())
+			w.Header().Set("X-RateLimit-Burst", fmt.Sprint(limiters2.GetBurst()))
+			w.Header().Set("X-RateLimit-Wait", reservation.Delay().String())
+
+			errorHandler.ServeHTTP(w, r)
+			reservation.Cancel()
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	}
+}
+
+func BlockMiddlewareFunc(limiters func(*http.Request) *Limiters, key func(*http.Request) string, errorHandler func(http.ResponseWriter, *http.Request, error)) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return blockMiddleware(limiters, key, errorHandler, next)
 	}
 }
 
 func BlockMiddleware(limiters func(*http.Request) *Limiters, key func(*http.Request) string, errorHandler func(http.ResponseWriter, *http.Request, error)) func(http.Handler) http.Handler {
-
 	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		return blockMiddleware(limiters, key, errorHandler, next)
+	}
+}
 
-			err := limiters(r).GetLimiter(key(r)).Wait(r.Context())
-			if err != nil {
-				errorHandler(w, r, err)
-				return
-			}
+func blockMiddleware(limiters func(*http.Request) *Limiters, key func(*http.Request) string, errorHandler func(http.ResponseWriter, *http.Request, error), next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 
-			next.ServeHTTP(w, r)
-		})
+		err := limiters(r).GetLimiter(key(r)).Wait(r.Context())
+		if err != nil {
+			errorHandler(w, r, err)
+			return
+		}
+
+		next.ServeHTTP(w, r)
 	}
 }
