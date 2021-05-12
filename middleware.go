@@ -28,6 +28,7 @@ func errorMiddleware(limiters func(*http.Request) *Limiters, errorHandler http.H
 			w.Header().Set("X-RateLimit-Every", limiters2.GetMinInterval().String())
 			w.Header().Set("X-RateLimit-Burst", fmt.Sprint(limiters2.GetBurst()))
 			w.Header().Set("X-RateLimit-Wait", reservation.Delay().String())
+			w.Header().Set("X-RateLimit-Bucket", limiters2.GetBucketName())
 
 			errorHandler.ServeHTTP(w, r)
 			reservation.Cancel()
