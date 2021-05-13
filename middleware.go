@@ -5,24 +5,24 @@ import (
 	"net/http"
 )
 
-func ErrorMiddlewareFunc(limiters func(*http.Request) *Limiters, errorHandler http.Handler) func(http.HandlerFunc) http.HandlerFunc {
+func ErrorMiddlewareFunc(limiters func(*http.Request) *Limiters, key func(*http.Request) string, errorHandler http.Handler) func(http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
-		return errorMiddleware(limiters, errorHandler, next)
+		return errorMiddleware(limiters, key, errorHandler, next)
 	}
 }
 
-func ErrorMiddleware(limiters func(*http.Request) *Limiters, errorHandler http.Handler) func(http.Handler) http.Handler {
+func ErrorMiddleware(limiters func(*http.Request) *Limiters, key func(*http.Request) string, errorHandler http.Handler) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return errorMiddleware(limiters, errorHandler, next)
+		return errorMiddleware(limiters, key, errorHandler, next)
 	}
 }
 
-func errorMiddleware(limiters func(*http.Request) *Limiters, errorHandler http.Handler, next http.Handler) http.HandlerFunc {
+func errorMiddleware(limiters func(*http.Request) *Limiters, key func(*http.Request) string, errorHandler http.Handler, next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		limiters2 := limiters(r)
 
-		reservation := limiters2.GetLimiter(r.RemoteAddr).Reserve()
+		reservation := limiters2.GetLimiter(key(r)).Reserve()
 		if reservation.Delay() > 0 {
 
 			w.Header().Set("X-RateLimit-Every", limiters2.GetMinInterval().String())
