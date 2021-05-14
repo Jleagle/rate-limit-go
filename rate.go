@@ -1,6 +1,8 @@
 package rate
 
 import (
+	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -116,4 +118,12 @@ func WithBucketName(name string) Option {
 	return func(l *Limiters) {
 		l.bucketName = name
 	}
+}
+
+func SetRateLimitHeaders(w http.ResponseWriter, limiters *Limiters, reservation *rate.Reservation) {
+
+	w.Header().Set("X-RateLimit-Every", limiters.GetMinInterval().String())
+	w.Header().Set("X-RateLimit-Burst", fmt.Sprint(limiters.GetBurst()))
+	w.Header().Set("X-RateLimit-Wait", reservation.Delay().String())
+	w.Header().Set("X-RateLimit-Bucket", "global")
 }
