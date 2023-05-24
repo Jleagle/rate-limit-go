@@ -125,5 +125,5 @@ func SetRateLimitHeaders(w http.ResponseWriter, limiters *Limiters, reservation 
 	w.Header().Set("X-RateLimit-Every", limiters.GetMinInterval().String())
 	w.Header().Set("X-RateLimit-Burst", fmt.Sprint(limiters.GetBurst()))
 	w.Header().Set("X-RateLimit-Wait", reservation.Delay().String())
-	w.Header().Set("X-RateLimit-Bucket", "global")
+	w.Header().Set("X-RateLimit-Bucket", limiters.GetBucketName())
 }
