@@ -13,10 +13,7 @@ func Error(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		reservation := limiters.GetLimiter(r.RemoteAddr).Reserve()
-		if reservation.Delay() > 0 {
-
-			reservation.Cancel()
-
+		if !reservation.OK() {
 			rate.SetRateLimitHeaders(w, limiters, reservation)
 			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 			return
