@@ -10,6 +10,8 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// New returns a new Limiters instance.
+// minInterval is the minimum interval between requests for a single key.
 func New(minInterval time.Duration, options ...Option) *Limiters {
 
 	l := &Limiters{
@@ -30,6 +32,7 @@ func New(minInterval time.Duration, options ...Option) *Limiters {
 	return l
 }
 
+// Limiters manages a collection of rate limiters, one per key.
 type Limiters struct {
 	limiters      map[string]*limiter
 	lock          sync.Mutex
@@ -51,14 +54,17 @@ type limiter struct {
 	updated time.Time
 }
 
+// GetBurst returns the burst size.
 func (l *Limiters) GetBurst() int {
 	return l.burst
 }
 
+// GetMinInterval returns the minimum interval between requests.
 func (l *Limiters) GetMinInterval() time.Duration {
 	return l.minInterval
 }
 
+// GetBucketName returns the bucket name used in headers.
 func (l *Limiters) GetBucketName() string {
 	return l.bucketName
 }
@@ -125,26 +131,31 @@ func (l *Limiters) clean() {
 	}
 }
 
+// Option is a function that configures a Limiters instance.
 type Option func(l *Limiters)
 
+// WithBurst sets the burst size for the limiters.
 func WithBurst(burst int) Option {
 	return func(l *Limiters) {
 		l.burst = burst
 	}
 }
 
+// WithCleanCutoff sets how long a limiter must be idle before it's removed.
 func WithCleanCutoff(duration time.Duration) Option {
 	return func(l *Limiters) {
 		l.cleanCutoff = duration
 	}
 }
 
+// WithCleanInterval sets how often the background cleanup goroutine runs.
 func WithCleanInterval(duration time.Duration) Option {
 	return func(l *Limiters) {
 		l.cleanInterval = duration
 	}
 }
 
+// WithBucketName sets the bucket name used in headers.
 func WithBucketName(name string) Option {
 	return func(l *Limiters) {
 		l.bucketName = name
