@@ -104,18 +104,24 @@ func (l *Limiters) GetLimiter(key string) *rate.Limiter {
 
 func (l *Limiters) clean() {
 
+	ticker := time.NewTicker(l.cleanInterval)
+	defer ticker.Stop()
+
 	for {
-		time.Sleep(l.cleanInterval)
+		select {
+		case <-l.stop:
+			return
+		case <-ticker.C:
+			cutoff := time.Now().Add(l.cleanCutoff * -1)
 
-		cutoff := time.Now().Add(l.cleanCutoff * -1)
-
-		l.lock.Lock()
-		for k, v := range l.limiters {
-			if v.updated.Before(cutoff) {
-				delete(l.limiters, k)
+			l.lock.Lock()
+			for k, v := range l.limiters {
+				if v.updated.Before(cutoff) {
+					delete(l.limiters, k)
+				}
 			}
+			l.lock.Unlock()
 		}
-		l.lock.Unlock()
 	}
 }
 
