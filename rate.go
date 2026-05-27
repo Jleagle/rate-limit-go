@@ -190,11 +190,24 @@ func (l *Limiters) Middleware(next http.Handler, keyFn func(r *http.Request) str
 // See: https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/
 func SetRateLimitHeaders(w http.ResponseWriter, limiters *Limiters, reservation *rate.Reservation) {
 
-	w.Header().Set("X-RateLimit-Every", limiters.GetMinInterval().String())
-	w.Header().Set("X-RateLimit-Burst", fmt.Sprint(limiters.GetBurst()))
-	w.Header().Set("X-RateLimit-Wait", reservation.Delay().String())
+	// RateLimit-Limit: contains the rate limit ceiling and parameters.
+	// Format: <limit>;window=<seconds>;policy="<name>"
+	limit := limiters.GetBurst()
+	window := limiters.GetMinInterval().Seconds()
+	limitHeader := fmt.Sprintf("%d;window=%.0f", limit, window)
 
 	if bucket := limiters.GetBucketName(); bucket != "" {
-		w.Header().Set("X-RateLimit-Bucket", bucket)
+		limitHeader += fmt.Sprintf(";policy=\"%s\"", bucket)
 	}
+	w.Header().Set("RateLimit-Limit", limitHeader)
+
+	// RateLimit-Remaining: number of requests left (approximate).
+	remaining := "0"
+	if reservation.Delay() == 0 {
+		remaining = "1" // We don't have exact remaining, but if delay is 0, at least 1 is possible
+	}
+	w.Header().Set("RateLimit-Remaining", remaining)
+
+	// RateLimit-Reset: seconds until the window resets or next request is allowed.
+	w.Header().Set("RateLimit-Reset", fmt.Sprintf("%.0f", reservation.Delay().Seconds()))
 }
