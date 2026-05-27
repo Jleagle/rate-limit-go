@@ -55,6 +55,23 @@ func (l *Limiters) GetBucketName() string {
 	return l.bucketName
 }
 
+// Allow is a shorthand for GetLimiter(key).Allow().
+func (l *Limiters) Allow(key string) bool {
+	return l.GetLimiter(key).Allow()
+}
+
+// Wait is a shorthand for GetLimiter(key).Wait(ctx).
+func (l *Limiters) Wait(ctx context.Context, key string) error {
+	return l.GetLimiter(key).Wait(ctx)
+}
+
+// Reserve is a shorthand for GetLimiter(key).Reserve().
+func (l *Limiters) Reserve(key string) *rate.Reservation {
+	return l.GetLimiter(key).Reserve()
+}
+
+// GetLimiter returns the rate.Limiter for the provided key.
+// It creates a new limiter if one doesn't exist for the key.
 func (l *Limiters) GetLimiter(key string) *rate.Limiter {
 
 	l.lock.Lock()
