@@ -151,6 +151,43 @@ func WithBucketName(name string) Option {
 	}
 }
 
+// Middleware returns a middleware that rate limits requests based on the provided key function.
+// If keyFn is nil, it defaults to using the remote address.
+func (l *Limiters) Middleware(next http.Handler, keyFn func(r *http.Request) string) http.Handler {
+	if keyFn == nil {
+		keyFn = func(r *http.Request) string {
+			return r.RemoteAddr
+		}
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		key := keyFn(r)
+		reservation := l.Reserve(key)
+
+		if !reservation.OK() {
+			SetRateLimitHeaders(w, l, reservation)
+			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
+			return
+		}
+
+		// Wait if necessary (though Reserve normally handles this, but here we check OK() first)
+		// If we wanted to block, we would use Wait().
+		// Since we want to error with 429 if the rate limit is exceeded, we use Reserve and check OK.
+		// However, Reserve(key).OK() is always true unless the limit is 0.
+		// We actually want to check if the reservation requires waiting.
+		if reservation.Delay() > 0 {
+			SetRateLimitHeaders(w, l, reservation)
+			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
+			reservation.Cancel()
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// SetRateLimitHeaders sets standard IETF draft rate limit headers on the response.
+// See: https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/
 func SetRateLimitHeaders(w http.ResponseWriter, limiters *Limiters, reservation *rate.Reservation) {
 
 	w.Header().Set("X-RateLimit-Every", limiters.GetMinInterval().String())
