@@ -1,6 +1,7 @@
 package rate
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -17,6 +18,7 @@ func New(minInterval time.Duration, options ...Option) *Limiters {
 		burst:         1,
 		cleanInterval: time.Minute,
 		cleanCutoff:   time.Hour,
+		stop:          make(chan struct{}),
 	}
 
 	for _, option := range options {
@@ -36,6 +38,12 @@ type Limiters struct {
 	cleanInterval time.Duration
 	cleanCutoff   time.Duration
 	bucketName    string
+	stop          chan struct{}
+}
+
+// Close stops the background cleanup goroutine.
+func (l *Limiters) Close() {
+	close(l.stop)
 }
 
 type limiter struct {
