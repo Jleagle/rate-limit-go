@@ -167,7 +167,11 @@ func WithBucketName(name string) Option {
 func (l *Limiters) Middleware(next http.Handler, keyFn func(r *http.Request) string) http.Handler {
 	if keyFn == nil {
 		keyFn = func(r *http.Request) string {
-			return r.RemoteAddr
+			ip, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err != nil {
+				return r.RemoteAddr
+			}
+			return ip
 		}
 	}
 
