@@ -3,8 +3,10 @@ package rate
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -15,7 +17,6 @@ import (
 func New(minInterval time.Duration, options ...Option) *Limiters {
 
 	l := &Limiters{
-		limiters:      map[string]*limiter{},
 		minInterval:   minInterval,
 		burst:         1,
 		cleanInterval: time.Minute,
@@ -34,8 +35,7 @@ func New(minInterval time.Duration, options ...Option) *Limiters {
 
 // Limiters manages a collection of rate limiters, one per key.
 type Limiters struct {
-	limiters      map[string]*limiter
-	lock          sync.Mutex
+	limiters      sync.Map
 	minInterval   time.Duration
 	burst         int
 	cleanInterval time.Duration
@@ -51,7 +51,7 @@ func (l *Limiters) Close() {
 
 type limiter struct {
 	limiter *rate.Limiter
-	updated time.Time
+	updated atomic.Int64
 }
 
 // GetBurst returns the burst size.
@@ -88,22 +88,18 @@ func (l *Limiters) Reserve(key string) *rate.Reservation {
 // It creates a new limiter if one doesn't exist for the key.
 func (l *Limiters) GetLimiter(key string) *rate.Limiter {
 
-	l.lock.Lock()
-	defer l.lock.Unlock()
-
-	lim, exists := l.limiters[key]
-
-	if !exists {
-
-		lim = &limiter{
+	v, ok := l.limiters.Load(key)
+	if !ok {
+		newLim := &limiter{
 			limiter: rate.NewLimiter(rate.Every(l.minInterval), l.burst),
 		}
-
-		l.limiters[key] = lim
+		v, _ = l.limiters.LoadOrStore(key, newLim)
 	}
 
+	lim := v.(*limiter)
+
 	// Touch limiter
-	lim.updated = time.Now()
+	lim.updated.Store(time.Now().UnixNano())
 
 	return lim.limiter
 }
@@ -118,15 +114,14 @@ func (l *Limiters) clean() {
 		case <-l.stop:
 			return
 		case <-ticker.C:
-			cutoff := time.Now().Add(l.cleanCutoff * -1)
+			cutoff := time.Now().Add(-l.cleanCutoff).UnixNano()
 
-			l.lock.Lock()
-			for k, v := range l.limiters {
-				if v.updated.Before(cutoff) {
-					delete(l.limiters, k)
+			l.limiters.Range(func(k, v interface{}) bool {
+				if v.(*limiter).updated.Load() < cutoff {
+					l.limiters.Delete(k)
 				}
-			}
-			l.lock.Unlock()
+				return true
+			})
 		}
 	}
 }

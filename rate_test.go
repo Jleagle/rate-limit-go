@@ -118,9 +118,11 @@ func TestCleanup(t *testing.T) {
 	l.Allow("user1")
 	l.Allow("user2")
 
-	l.lock.Lock()
-	count := len(l.limiters)
-	l.lock.Unlock()
+	count := 0
+	l.limiters.Range(func(key, value interface{}) bool {
+		count++
+		return true
+	})
 	if count != 2 {
 		t.Errorf("expected 2 limiters, got %d", count)
 	}
@@ -128,9 +130,11 @@ func TestCleanup(t *testing.T) {
 	// Wait for cleanup
 	time.Sleep(time.Millisecond * 500)
 
-	l.lock.Lock()
-	count = len(l.limiters)
-	l.lock.Unlock()
+	count = 0
+	l.limiters.Range(func(key, value interface{}) bool {
+		count++
+		return true
+	})
 	if count != 0 {
 		t.Errorf("expected 0 limiters after cleanup, got %d", count)
 	}
